@@ -7,6 +7,7 @@ import csv
 
 import google.datalab.bigquery as bq
 
+
 from tensorflow.contrib.factorization import WALSModel
 
 Rating = collections.namedtuple('Rating', ['user_id', 'item_id', 'rating'])
