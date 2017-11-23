@@ -59,7 +59,7 @@ def new_dataset(ratings):
 
 def load_events(table_name, percentage=1):
     # returns all transaction and addtocart events, but distinct on visitorid and itemid (i.e. no difference between 1 event and 5)
-    query = ("SELECT DISTINCT userID as visitorid, movieID as itemid, rating  FROM `{}`").format(table_name)
+    query = "SELECT DISTINCT userID as visitorid, movieID as itemid, rating  FROM `{}`".format(table_name)
     output_ratings = bq.Query(query)
     df = output_ratings.execute(output_options=bq.QueryOutput.dataframe()).result()
     df['rating'] = pd.to_numeric(df['rating']).astype(float)
@@ -289,7 +289,6 @@ als = ALSRecommender()
 als_model = als.fit(train, verbose=True)
 
 _x, y_hat = list(als_model.transform(valid_prune.sample(n=1)))[0]
-y_hat
 
 for k in range(10):
     item = valid_prune.sample(n=1)
