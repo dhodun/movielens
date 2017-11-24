@@ -1,4 +1,3 @@
-
 # Create Mapping
 # Map User <-> index
 # Map Item <-> index
@@ -126,8 +125,6 @@ valid_prune = valid_prune[valid_prune["visitorid"].isin(train["visitorid"])]
 test_prune = test_prune[test_prune["visitorid"].isin(train["visitorid"])]
 
 print_datasets([train, valid_prune, test_prune])
-
-
 
 
 def map_index(values):

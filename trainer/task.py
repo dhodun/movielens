@@ -1,11 +1,12 @@
 import argparse
 
+import tensorflow as tf
+
 import model
 
 
-
-
 def main(args):
+    tf.logging.set_verbosity(tf.logging.INFO)
 
     # process input data
     ratings = model.load_ratings('dhodun1.cs229_movielens.ratings_small')
@@ -31,23 +32,38 @@ def main(args):
     # log results
 
 
+
+
+    # log results
+    train_rmse = model.get_rmse(output_row, output_col, train_sparse)
+    test_rmse = model.get_rmse(output_row, output_col, test_sparse)
+
     tf.logging.info("train RMSE = %.2f" % train_rmse)
     tf.logging.info("test RMSE = %.2f" % test_rmse)
 
     return
 
 
-
-
-
 def parse_arguments():
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '--job-dir',
+        help='GCS location to write checkpoints and export models',
+        required=True
+    )
 
     # required
     parser.add_argument(
         '--job-name',
         help='Unique identifier for job',
         required=False
+    )
+    parser.add_argument(
+        '--hypertune',
+        default=False,
+        action="store_true",
+        help='Switch to turn on or off hyperparam tuning'
     )
 
     args = parser.parse_args()
