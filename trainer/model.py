@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import os
 import csv
+import datetime
 
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
@@ -62,75 +63,80 @@ def create_test_and_train(ratings):
 
 
 def create_sparse_sets(train, test, num_users, num_movies):
-    train_sparse = coo_matrix(train['rating'], (train['user'], train['item']))
-    test_sparse = coo_matrix(test['rating'], (test['user'], test['item']))
+    train_sparse = tf.SparseTensor(train[['user','item']].as_matrix(), train['rating'].as_matrix(), [num_users,num_movies])
+    test_sparse = tf.SparseTensor(test[['user', 'item']].as_matrix(), test['rating'].as_matrix(), [num_users, num_movies])
+
     return train_sparse, test_sparse
 
 
-def train_model(train_sparse, test_sparse, num_users, num_movies):
+def rmse(model, train_sparse):
+    approx_matrix = approx_sparse(model, train_sparse.indices, train_sparse.dense_shape)
+    err = tf.sparse_add(train_sparse, approx_matrix * (-1))
+    err2 = tf.square(err)
+    n = train_sparse.values.shape[0].value
+    return tf.sqrt(tf.sparse_reduce_sum(err2) / n)
 
-    num_factors = 5
+
+def approx_sparse(model, indices, shape):
+    row_factors = tf.nn.embedding_lookup(
+        model.row_factors,
+        tf.range(model._input_rows),
+        partition_strategy="div")
+    col_factors = tf.nn.embedding_lookup(
+        model.col_factors,
+        tf.range(model._input_cols),
+        partition_strategy="div")
+
+    row_indices, col_indices = tf.split(indices,
+                                        axis=1,
+                                        num_or_size_splits=2)
+    gathered_row_factors = tf.gather(row_factors, row_indices)
+    gathered_col_factors = tf.gather(col_factors, col_indices)
+    approx_vals = tf.squeeze(tf.matmul(gathered_row_factors,
+                                       gathered_col_factors,
+                                       adjoint_b=True))
+
+    return tf.SparseTensor(indices=indices,
+                           values=approx_vals,
+                           dense_shape=shape)
+
+
+def train_model(train_sparse, test_sparse, num_users, num_movies, verbose=False):
+
+    num_factors = 10
     regularization = 1e-1
+    epochs = 10
 
     tf.logging.info('Train Start: {:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
 
-    # create model
-    model = WALSModel(
+
+
+
+
+
+
+
+    with train_sparse.graph.as_default(), tf.Session() as sess:
+
+        # create model
+        model = WALSModel(
             num_users,
             num_movies,
             num_factors,
             regularization=regularization,
             unobserved_weight=0)
 
+        # train model
 
-    with tf.Graph().as_default(), tf.Session() as sess:
+        rmse_op = rmse(model, train_sparse) if verbose else None
+        print('test')
 
-    def als_model(self, dataset):
-        return WALSModel(
-            len(dataset["visitorid"].unique()),
-            len(dataset["itemid"].unique()),
-            self.num_factors,
-            regularization=self.regularization,
-            unobserved_weight=0)
-
-    hypertune = args['hypertune']
-    dim = args['latent_factors']
-    num_iters = args['num_iters']
-    reg = args['regularization']
-    unobs = args['unobs_weight']
-    wt_type = args['wt_type']
-    feature_wt_exp = args['feature_wt_exp']
-    obs_wt = args['feature_wt_factor']
-
-    tf.logging.info('Train Start: {:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
-
-    # generate model
-    input_tensor, row_factor, col_factor, model = \
-        wals.wals_model(tr_sparse, dim, reg, unobs, args['weights'], wt_type, feature_wt_exp, obs_wt)
-
-    # factorize matrix
-    session = wals.simple_train(model, input_tensor, num_iters)
-
-    tf.logging.info('Train Finish: {:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
-
-    # evaluate output factor matrices
-    output_row = row_factor.eval(session=session)
-    output_col = col_factor.eval(session=session)
-
-    # close the training session now that we've evaluated the output
-    session.close()
-
-
-
-    def train(self, model, input_matrix, verbose=False):
-        rmse_op = self.rmse_op(model, input_matrix) if verbose else None
-
-        row_update_op = model.update_row_factors(sp_input=input_matrix)[1]
-        col_update_op = model.update_col_factors(sp_input=input_matrix)[1]
+        row_update_op = model.update_row_factors(sp_input=train_sparse)[1]
+        col_update_op = model.update_col_factors(sp_input=train_sparse)[1]
 
         model.initialize_op.run()
         model.worker_init.run()
-        for _ in range(self.num_iters):
+        for _ in range(epochs):
             # Update Users
             model.row_update_prep_gramian_op.run()
             model.initialize_row_update_op.run()
@@ -143,9 +149,13 @@ def train_model(train_sparse, test_sparse, num_users, num_movies):
             if verbose:
                 print('RMSE: {:,.3f}'.format(rmse_op.eval()))
 
-    return output_row, output_col
+    row_factor = model.row_factors[0].eval()
+    col_factor = model.col_factors[0].eval()
+
+    tf.logging.info('Train Finish: {:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
 
 
-def wals_model():
+    return row_factor, col_factor
 
-    pass
+
+

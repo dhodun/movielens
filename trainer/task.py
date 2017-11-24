@@ -23,7 +23,7 @@ def main(args):
     train_sparse, test_sparse = model.create_sparse_sets(train, test, num_users, num_movies)
 
     # train model
-    output_row, output_col = model.train_model(train_sparse, test_sparse, num_users, num_movies)
+    output_row, output_col = model.train_model(train_sparse, test_sparse, num_users, num_movies, verbose=True)
 
     # save trained model to job directory
 
@@ -58,3 +58,5 @@ def parse_arguments():
 if __name__ == '__main__':
     args = parse_arguments()
     main(args)
+    # TODO replace with tf.app.run() ?
+    # TODO compare with westlake format
