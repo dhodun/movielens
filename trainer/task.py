@@ -9,7 +9,7 @@ def main(args):
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # process input data
-    ratings = model.load_ratings('dhodun1.cs229_movielens.ratings_small')
+    ratings = model.load_ratings('gs://dhodun1-ml/movielens/data/ml-latest-small/ratings.csv')
 
     # create mapping
     user_encoder, movie_encoder = model.create_mappings(ratings)
@@ -26,20 +26,16 @@ def main(args):
     # train model
     output_row, output_col = model.train_model(train_sparse, test_sparse, num_users, num_movies, verbose=True)
 
-    # save trained model to job directory
-
-
-    # log results
-
-
-
-
     # log results
     train_rmse = model.get_rmse(output_row, output_col, train_sparse)
     test_rmse = model.get_rmse(output_row, output_col, test_sparse)
 
     tf.logging.info("train RMSE = %.2f" % train_rmse)
     tf.logging.info("test RMSE = %.2f" % test_rmse)
+
+    # save trained model to job directory
+
+    model.save_model(args, output_row, output_col)
 
     return
 
@@ -49,15 +45,9 @@ def parse_arguments():
 
     parser.add_argument(
         '--job-dir',
+        default='gs://dhodun1-ml/movielens/temp/job_dir/',
         help='GCS location to write checkpoints and export models',
         required=True
-    )
-
-    # required
-    parser.add_argument(
-        '--job-name',
-        help='Unique identifier for job',
-        required=False
     )
     parser.add_argument(
         '--hypertune',
@@ -75,4 +65,4 @@ if __name__ == '__main__':
     args = parse_arguments()
     main(args)
     # TODO replace with tf.app.run() ?
-    # TODO compare with westlake format
+    # TODO compare with west-lake format

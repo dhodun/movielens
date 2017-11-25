@@ -1,7 +1,8 @@
-scipy
-scikit-learn
-pandas
+scipy==0.19.0
+scikit-learn==0.18.1
+pandas==0.19.2
 ipython
 jupyter
 datalab
-tensorflow
+tensorflow==1.2.0
+numpy==1.12.1

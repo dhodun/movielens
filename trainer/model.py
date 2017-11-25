@@ -1,21 +1,23 @@
 import datetime
 import math
+import os
 
-import google.datalab.bigquery as bq
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from scipy.sparse import coo_matrix
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from tensorflow.contrib.factorization import WALSModel
+from tensorflow.python.lib.io import file_io
 
 
-def load_ratings(table_name):
+def load_ratings(filename):
     # returns all user / movie ratings in the table_name
 
-    query = "SELECT DISTINCT userID AS user, movieID AS item, rating AS rating  FROM `{}`".format(table_name)
-    output_ratings = bq.Query(query)
-    df = output_ratings.execute(output_options=bq.QueryOutput.dataframe()).result()
+    df = pd.read_csv(file_io.FileIO(filename, 'r'))
+    df.columns = ['user', 'item', 'rating', 'timestamp']
+    df.drop('timestamp', axis=1)
 
     return df
 
@@ -162,3 +164,10 @@ def get_rmse(output_row, output_col, actual):
     mse = mse / actual.data.shape[0]
     rmse = math.sqrt(mse)
     return rmse
+
+
+def save_model(args, output_row, output_col):
+    model_dir = os.path.join(args.job_dir, 'model')
+    np.save(file_io.FileIO(os.path.join(model_dir, 'row_factor'), 'w'), output_row)
+    np.save(file_io.FileIO(os.path.join(model_dir, 'col_factor'), 'w'), output_col)
+    return None
