@@ -1,0 +1,44 @@
+trainingInput:
+  scaleTier: CUSTOM
+  masterType: standard_gpu
+  hyperparameters:
+    goal: MINIMIZE
+    maxTrials: 500
+    maxParallelTrials: 50
+    params:
+      - parameterName: num_factors
+        type: INTEGER
+        minValue: 3
+        maxValue: 80
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: regularization
+        type: DOUBLE
+        minValue: 0.0001
+        maxValue: 5
+        scaleType: UNIT_LOG_SCALE
+      - parameterName: epochs
+        type: INTEGER
+        minValue: 8
+        maxValue: 30
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: unobserved_weight
+        type: DOUBLE
+        minValue: 0.001
+        maxValue: 5
+        scaleType: UNIT_LOG_SCALE
+      - parameterName: row_weight_bool
+        type: CATEGORICAL
+        categoricalValues: ["True", "False"]
+      - parameterName: row_weight_factor
+        type: INTEGER
+        minValue: 1
+        maxValue: 200
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: col_weight_bool
+        type: CATEGORICAL
+        categoricalValues: ["True", "False"]
+      - parameterName: col_weight_factor
+        type: INTEGER
+        minValue: 1
+        maxValue: 200
+        scaleType: UNIT_LINEAR_SCALE

@@ -11,6 +11,8 @@ from sklearn.model_selection import train_test_split
 from tensorflow.contrib.factorization import WALSModel
 from tensorflow.python.lib.io import file_io
 
+import util
+
 
 def load_ratings(filename):
     # returns all user / movie ratings in the table_name
@@ -69,6 +71,20 @@ def create_sparse_sets(train, test, num_users, num_movies):
     return train_sparse, test_sparse
 
 
+def make_weights(data, weight_factor, axis):
+    # first calculate how many of each factor there is to divide weights by
+    fraction = np.array(1.0 / (data > 0).sum(axis))
+
+    # fill in NaNs with 0
+    fraction[np.ma.masked_invalid(fraction).mask] = 0
+
+    # multiply by factor and flatten
+    weights = np.array(fraction * weight_factor).flatten()
+
+    return weights
+
+
+
 def rmse(model, input_tensor):
     approx_matrix = approx_sparse(model, input_tensor.indices, input_tensor.dense_shape)
     err = tf.sparse_add(input_tensor, approx_matrix * (-1))
@@ -101,22 +117,29 @@ def approx_sparse(model, indices, shape):
                            dense_shape=shape)
 
 
-def train_model(train_sparse, test_sparse, num_users, num_movies, verbose=False):
-    num_factors = 10
-    regularization = 1e-1
-    epochs = 10
-
+def train_model(train_sparse, test_sparse, num_users, num_movies, args, verbose=False):
     tf.logging.info('Train Start: {:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
 
     with tf.Graph().as_default(), tf.Session() as sess:
+
+        row_weights = np.ones(num_users)
+        col_weights = np.ones(num_movies)
+
+        if args.col_weight_bool:
+            col_weights = make_weights(train_sparse, args.col_weight_factor, axis=0)
+
+        if args.row_weight_bool:
+            row_weights = make_weights(train_sparse, args.row_weight_factor, axis=1)
 
         # create model
         model = WALSModel(
             num_users,
             num_movies,
-            num_factors,
-            regularization=regularization,
-            unobserved_weight=0)
+            args.num_factors,
+            regularization=args.regularization,
+            unobserved_weight=args.unobserved_weight,
+            row_weights=row_weights,
+            col_weights=col_weights)
 
         # create sparse tensor
 
@@ -124,16 +147,21 @@ def train_model(train_sparse, test_sparse, num_users, num_movies, verbose=False)
                                        values=(train_sparse.data).astype(np.float32),
                                        dense_shape=train_sparse.shape)
 
+        test_tensor = tf.SparseTensor(indices=zip(test_sparse.row, test_sparse.col),
+                                      values=(test_sparse.data).astype(np.float32),
+                                      dense_shape=test_sparse.shape)
+
         # train model
 
         rmse_op = rmse(model, input_tensor) if verbose else None
+        rmse_test_op = rmse(model, test_tensor)
 
         row_update_op = model.update_row_factors(sp_input=input_tensor)[1]
         col_update_op = model.update_col_factors(sp_input=input_tensor)[1]
 
         model.initialize_op.run()
         model.worker_init.run()
-        for _ in range(epochs):
+        for _ in range(args.epochs):
             # Update Users
             model.row_update_prep_gramian_op.run()
             model.initialize_row_update_op.run()
@@ -144,7 +172,11 @@ def train_model(train_sparse, test_sparse, num_users, num_movies, verbose=False)
             col_update_op.run()
 
             if verbose:
-                tf.logging.info('RMSE: {:,.3f}'.format(rmse_op.eval()))
+                train_metric = rmse_op.eval()
+                test_metric = rmse_test_op.eval()
+                tf.logging.info('RMSE Train: {:,.3f}'.format(train_metric))
+                tf.logging.info('RMSE Test:  {:,.3f}'.format(test_metric))
+                # TODO Collect these in variable for graphing later
 
         row_factor = model.row_factors[0].eval()
         col_factor = model.col_factors[0].eval()
@@ -167,7 +199,19 @@ def get_rmse(output_row, output_col, actual):
 
 
 def save_model(args, output_row, output_col):
-    model_dir = os.path.join(args.job_dir, 'model')
-    np.save(file_io.FileIO(os.path.join(model_dir, 'row_factor'), 'w'), output_row)
-    np.save(file_io.FileIO(os.path.join(model_dir, 'col_factor'), 'w'), output_col)
+    model_dir = os.path.join(args.output_dir, 'model')
+
+    # save localy, then try to copy to GCS
+    np.save('row_factor', output_row)
+    np.save('col_factor', output_col)
+
+    # copy to GCS?
+    util.copy_file_to_gcs(model_dir, 'row_factor.npy')
+    util.copy_file_to_gcs(model_dir, 'col_factor.npy')
+
+    # these lines did not work in TF 1.2, worked in TF1.3, but CMLE did not support 1.3 w/ GPU at time, even if we
+    # overloaded the setup.py
+
+    # np.save(file_io.FileIO(os.path.join(output_dir, 'row_factor'), 'w'), output_row)
+    # np.save(file_io.FileIO(os.path.join(output_dir, 'col_factor'), 'w'), output_col)
     return None

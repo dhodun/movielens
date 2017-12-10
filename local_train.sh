@@ -6,4 +6,6 @@ gcloud ml-engine local train \
                       --module-name trainer.task \
                       --package-path trainer \
                       --job-dir $MODEL_BUCKET/$JOB_ID \
+                      --configuration config_hypertune.yaml \
                       -- \
+                      --output-dir $MODEL_BUCKET/movielens/$JOB_ID

@@ -4,5 +4,4 @@ pandas==0.19.2
 ipython
 jupyter
 datalab
-tensorflow==1.2.0
 numpy==1.12.1
